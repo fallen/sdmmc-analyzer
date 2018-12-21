@@ -4,6 +4,7 @@
 SDMMCAnalyzerSettings::SDMMCAnalyzerSettings()
 :	mClockChannel(UNDEFINED_CHANNEL),
 	mCommandChannel(UNDEFINED_CHANNEL),
+	mData0Channel(UNDEFINED_CHANNEL),
 	mProtocol(PROTOCOL_MMC),
 	mSampleEdge(SAMPLE_EDGE_RISING)
 {
@@ -14,6 +15,10 @@ SDMMCAnalyzerSettings::SDMMCAnalyzerSettings()
 	mCommandChannelInterface.reset(new AnalyzerSettingInterfaceChannel());
 	mCommandChannelInterface->SetTitleAndTooltip("Command", "Command (CMD)");
 	mCommandChannelInterface->SetChannel(mCommandChannel);
+
+	mData0ChannelInterface.reset(new AnalyzerSettingInterfaceChannel());
+	mData0ChannelInterface->SetTitleAndTooltip("Data0", "Data0 (MISO)");
+	mData0ChannelInterface->SetChannel(mData0Channel);
 
 	mProtocolInterface.reset(new AnalyzerSettingInterfaceNumberList());
 	mProtocolInterface->SetTitleAndTooltip("Protocol", "Protocol");
@@ -29,12 +34,14 @@ SDMMCAnalyzerSettings::SDMMCAnalyzerSettings()
 
 	AddInterface(mClockChannelInterface.get());
 	AddInterface(mCommandChannelInterface.get());
+	AddInterface(mData0ChannelInterface.get());
 	AddInterface(mProtocolInterface.get());
 	AddInterface(mSampleEdgeInterface.get());
 
 	ClearChannels();
 	AddChannel(mClockChannel, "Clock", false);
 	AddChannel(mCommandChannel, "Command", false);
+	AddChannel(mData0Channel, "Data0", false);
 }
 
 SDMMCAnalyzerSettings::~SDMMCAnalyzerSettings()
@@ -45,6 +52,7 @@ bool SDMMCAnalyzerSettings::SetSettingsFromInterfaces()
 {
 	Channel clk = mClockChannelInterface->GetChannel();
 	Channel cmd = mCommandChannelInterface->GetChannel();
+	Channel data0 = mData0ChannelInterface->GetChannel();
 
 	if (clk == cmd) {
 		SetErrorText("Please select different channels for each input.");
@@ -53,12 +61,14 @@ bool SDMMCAnalyzerSettings::SetSettingsFromInterfaces()
 
 	mClockChannel = clk;
 	mCommandChannel = cmd;
+	mData0Channel = data0;
 	mProtocol = SDMMCProtocol((U32)mProtocolInterface->GetNumber());
 	mSampleEdge = SDMMCSampleEdge((U32)mSampleEdgeInterface->GetNumber());
 
 	ClearChannels();
 	AddChannel(mClockChannel, "Clock", true);
 	AddChannel(mCommandChannel, "Command", true);
+	AddChannel(mData0Channel, "Data0", true);
 
 	return true;
 }
@@ -67,6 +77,7 @@ void SDMMCAnalyzerSettings::UpdateInterfacesFromSettings()
 {
 	mClockChannelInterface->SetChannel(mClockChannel);
 	mCommandChannelInterface->SetChannel(mCommandChannel);
+	mData0ChannelInterface->SetChannel(mData0Channel);
 	mProtocolInterface->SetNumber(mProtocol);
 	mSampleEdgeInterface->SetNumber(mSampleEdge);
 }
@@ -80,12 +91,14 @@ void SDMMCAnalyzerSettings::LoadSettings(const char *settings)
 
 	archive >> mClockChannel;
 	archive >> mCommandChannel;
+	archive >> mData0Channel;
 	archive >> tmp; mProtocol = SDMMCProtocol(tmp);
 	archive >> tmp; mSampleEdge = SDMMCSampleEdge(tmp);
 
 	ClearChannels();
 	AddChannel(mClockChannel, "Clock", true);
 	AddChannel(mCommandChannel, "Command", true);
+	AddChannel(mData0Channel, "Data0", true);
 
 	UpdateInterfacesFromSettings();
 }
@@ -96,6 +109,7 @@ const char *SDMMCAnalyzerSettings::SaveSettings()
 
 	archive << mClockChannel;
 	archive << mCommandChannel;
+	archive << mData0Channel;
 	archive << mProtocol;
 	archive << mSampleEdge;
 

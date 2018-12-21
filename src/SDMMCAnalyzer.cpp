@@ -2,6 +2,7 @@
 #include "SDMMCAnalyzer.h"
 #include "SDMMCAnalyzerResults.h"
 #include "SDMMCHelpers.h"
+#include <stdio.h>
 
 const char SDMMCAnalyzer::Name[] = "SDMMC";
 
@@ -29,9 +30,11 @@ void SDMMCAnalyzer::WorkerThread()
 	SetAnalyzerResults(mResults.get());
 
 	mResults->AddChannelBubblesWillAppearOn(mSettings->mCommandChannel);
+	mResults->AddChannelBubblesWillAppearOn(mSettings->mData0Channel);
 
 	mClock = GetAnalyzerChannelData(mSettings->mClockChannel);
 	mCommand = GetAnalyzerChannelData(mSettings->mCommandChannel);
+	mData0 = GetAnalyzerChannelData(mSettings->mData0Channel);
 
 	while (true) {
 		int cmdindex;
@@ -51,6 +54,8 @@ void SDMMCAnalyzer::WorkerThread()
 			if (response.mType != MMC_RSP_NONE)
 				WaitForAndReadMMCResponse(response);
 		} else {
+			if (cmdindex == 51)
+				printf("command 51 !\n");
 			/* FIXME: implement SD response handling */
 		}
 	}
@@ -85,12 +90,18 @@ void SDMMCAnalyzer::AdvanceToNextClock()
 	} while (mClock->GetBitState() != search);
 
 	mCommand->AdvanceToAbsPosition(mClock->GetSampleNumber());
+	mData0->AdvanceToAbsPosition(mClock->GetSampleNumber());
 }
 
 int SDMMCAnalyzer::TryReadCommand()
 {
 	int index;
+	bool startData = false;
 	
+	//printf("TryReadCommand\n");
+
+
+
 	/* check for start bit */
 	if (mCommand->GetBitState() != BIT_LOW)
 		return -1;
@@ -151,6 +162,68 @@ int SDMMCAnalyzer::TryReadCommand()
 
 	/* stop bit */
 	mResults->AddMarker(mClock->GetSampleNumber(), AnalyzerResults::Stop, mSettings->mCommandChannel);
+
+	if (index == 51) {
+		// read SCR reg
+		/* check for start bit */
+		while (mData0->GetBitState() != BIT_LOW)
+			AdvanceToNextClock();
+
+		if (mData0->GetBitState() == BIT_LOW) {
+			printf("we detected Data0 start bit\n");
+			startData = true;
+			AdvanceToNextClock();
+		}
+
+		if (startData) {
+			for (int byte = 0; byte < 8; byte++) { // read 8 bytes
+				Frame frame;
+				frame.mStartingSampleInclusive = mClock->GetSampleNumber();
+				frame.mData1 = 0;
+				frame.mData2 = 0;
+				frame.mType = SDMMCAnalyzerResults::FRAMETYPE_MISO;
+				mResults->AddMarker(mClock->GetSampleNumber(), AnalyzerResults::Start, mSettings->mData0Channel);
+				for (int bit = 0; bit < 8; bit++) { // read 1 byte
+					frame.mData1 = (frame.mData1 << 1) | mData0->GetBitState();
+					if (bit == 7)
+						mResults->AddMarker(mClock->GetSampleNumber(), AnalyzerResults::Stop, mSettings->mData0Channel);
+					AdvanceToNextClock();
+				}
+				frame.mEndingSampleInclusive = mClock->GetSampleNumber() - 1;
+				mResults->AddFrame(frame);
+			}
+				/* 2 bytes crc */
+			{
+				Frame frame;
+
+				frame.mStartingSampleInclusive = mClock->GetSampleNumber();
+				frame.mData1 = 0;
+				frame.mType = SDMMCAnalyzerResults::FRAMETYPE_CRC;
+
+				for (int bit = 0; bit < 8; bit++) {
+					frame.mData1 = (frame.mData1 << 1) | mData0->GetBitState();
+					AdvanceToNextClock();
+				}
+				frame.mEndingSampleInclusive = mClock->GetSampleNumber() - 1;
+				mResults->AddFrame(frame);
+			}
+			{
+				Frame frame;
+
+				frame.mStartingSampleInclusive = mClock->GetSampleNumber();
+				frame.mData1 = 0;
+				frame.mType = SDMMCAnalyzerResults::FRAMETYPE_CRC;
+
+				for (int bit = 0; bit < 8; bit++) {
+					frame.mData1 = (frame.mData1 << 1) | mData0->GetBitState();
+					AdvanceToNextClock();
+				}
+				frame.mEndingSampleInclusive = mClock->GetSampleNumber() - 1;
+				mResults->AddFrame(frame);
+			}
+		}
+	}
+
 
 	mResults->CommitResults();
 	ReportProgress(mClock->GetSampleNumber());

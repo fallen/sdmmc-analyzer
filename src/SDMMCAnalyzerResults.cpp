@@ -2,6 +2,7 @@
 #include "SDMMCAnalyzer.h"
 #include "SDMMCAnalyzerSettings.h"
 #include "SDMMCHelpers.h"
+#include <stdio.h>
 
 SDMMCAnalyzerResults::SDMMCAnalyzerResults(SDMMCAnalyzer* analyzer, SDMMCAnalyzerSettings* settings)
 :	AnalyzerResults(),
@@ -20,6 +21,15 @@ void SDMMCAnalyzerResults::GenerateBubbleText(U64 frame_index, Channel& channel,
 	Frame frame = GetFrame(frame_index);
 
 	switch (frame.mType) {
+	case FRAMETYPE_MISO:
+	{
+		char str_cmd[10];
+		printf("allo on genere une bubble text pour MISO\n");
+		AnalyzerHelpers::GetNumberString(frame.mData1, Decimal, 8, str_cmd, sizeof(str_cmd));
+		AddResultString(str_cmd);
+		AddResultString("MISO: ", str_cmd);
+		break;
+	}
 	case FRAMETYPE_HEADER:
 		if (frame.mData1 == 1)
 			AddResultString("Host sending");

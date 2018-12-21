@@ -31,6 +31,7 @@ protected:
 	SimulationChannelDescriptorGroup mChannels;
 	SimulationChannelDescriptor *mClock;
 	SimulationChannelDescriptor *mCommand;
+	SimulationChannelDescriptor *mData0;
 };
 
 #endif

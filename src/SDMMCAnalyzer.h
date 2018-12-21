@@ -39,6 +39,7 @@ protected:
 
 	AnalyzerChannelData *mClock;
 	AnalyzerChannelData *mCommand;
+	AnalyzerChannelData *mData0;
 };
 
 extern "C" ANALYZER_EXPORT const char* __cdecl GetAnalyzerName();
